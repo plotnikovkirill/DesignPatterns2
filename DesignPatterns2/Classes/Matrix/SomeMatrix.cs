@@ -1,7 +1,7 @@
 ﻿using DesignPatterns2.Classes.VectorClasses;
 using DesignPatterns2.Interfaces;
 
-namespace DesignPatterns2.Classes.MatrixClasses
+namespace DesignPatterns2.Classes.Matrix
 {
     abstract class SomeMatrix: IMatrix
     {

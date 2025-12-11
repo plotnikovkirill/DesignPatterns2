@@ -6,7 +6,7 @@ using System.Linq;
 using System.Text;
 using System.Threading.Tasks;
 
-namespace DesignPatterns2.Classes.MatrixClasses
+namespace DesignPatterns2.Classes.Matrix
 {
     internal class RegularMatrix: SomeMatrix
     {

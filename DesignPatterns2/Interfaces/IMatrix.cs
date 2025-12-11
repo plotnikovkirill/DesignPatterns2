@@ -6,7 +6,7 @@ using System.Threading.Tasks;
 
 namespace DesignPatterns2.Interfaces
 {
-    internal interface IMatrix
+    public interface IMatrix
     {
         public float GetElement(int indexX, int indexY);
         public void SetElement(int indexX, int indexY, float newValue);
