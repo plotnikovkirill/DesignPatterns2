@@ -2,7 +2,6 @@
 using DesignPatterns2.Classes.Decorators;
 using DesignPatterns2.Interfaces;
 using System;
-using DesignPatterns2.Classes.Matrix;
 
 namespace DesignPatterns2.Tests
 {

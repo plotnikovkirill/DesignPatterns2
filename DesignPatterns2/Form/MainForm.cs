@@ -1,92 +1,119 @@
 ﻿using System;
 using System.Collections.Generic;
+using System.Drawing;
 using System.Linq;
-using System.Text;
-using System.Threading.Tasks;
+using System.Windows.Forms;
 using DesignPatterns2.Classes.AdditionalClasses;
 using DesignPatterns2.Classes.Drawing;
 using DesignPatterns2.Classes.Matrix;
 using DesignPatterns2.Classes.Visualization;
 using DesignPatterns2.Classes.Decorators;
 using DesignPatterns2.Interfaces;
-using System.Drawing;
-using System.Windows.Forms;
-using DesignPatterns2.Classes.Matrix;
+//using DesignPatterns2.Command;
+using DesignPatterns2.Classes.Comand;
 
 namespace DesignPatterns2.Forms
 {
     public partial class MainForm : Form
     {
+        // UI Controls
         private Button btnGenerateRegular;
         private Button btnGenerateSparse;
         private Button btnGenerateHorizontalComposite;
         private Button btnGenerateVerticalComposite;
         private Button btnGenerateComplexComposite;
+        private Button btnChange;           // ✨ NEW: Кнопка "Изменить"
+        private Button btnUndo;             // ✨ NEW: Кнопка "Отменить"
+        private Button btnClearHistory;     // ✨ NEW: Очистить историю
         private Button btnRenumber;
         private Button btnRestore;
         private CheckBox chkShowBorder;
         private Panel graphicsPanel;
         private TextBox consoleTextBox;
+        private TextBox commandHistoryTextBox;  // ✨ NEW: История команд
         private Label lblGraphics;
         private Label lblConsole;
         private Label lblInfo;
+        private Label lblCommandHistory;    // ✨ NEW
 
+        // Matrix state
         private MatrixVisualization? currentVisualization;
         private IMatrix? currentMatrix;
         private IMatrix? originalMatrix;
         private RenumberingDecorator? decorator;
         private bool isDecorated = false;
 
+        // Command Manager
+        private readonly CommandManager _commandManager;
+
         public MainForm()
         {
+            // Получаем Singleton CommandManager
+            _commandManager = CommandManager.Instance;
+
             InitializeComponent();
+
+            // Инициализация приложения через команду
+            InitializeApplication();
+        }
+
+        /// <summary>
+        /// Инициализация приложения через Command Pattern
+        /// </summary>
+        private void InitializeApplication()
+        {
+            var initCommand = new InitializeApplicationCommand("Matrix Command App", "2.0");
+            _commandManager.RegisterCommand(initCommand);
+
+            UpdateCommandHistory();
+            UpdateUndoButton();
         }
 
         private void InitializeComponent()
         {
-            this.Text = "Визуализация матриц - Паттерны Composite, Bridge и Decorator";
-            this.Size = new Size(1200, 800);
+            this.Text = "Матрицы - Паттерн Command (Отмена операций)";
+            this.Size = new Size(1400, 900);
             this.StartPosition = FormStartPosition.CenterScreen;
 
             // Информационная метка
             lblInfo = new Label
             {
-                Text = "COMPOSITE PATTERN: Составные матрицы",
+                Text = "COMMAND PATTERN: Отмена операций",
                 Location = new Point(20, 5),
-                Size = new Size(1150, 20),
+                Size = new Size(1350, 20),
                 Font = new Font("Arial", 12, FontStyle.Bold),
                 ForeColor = Color.DarkBlue
             };
             this.Controls.Add(lblInfo);
 
-            // Первая строка кнопок - простые матрицы
+            #region Matrix Generation Buttons (First Row)
+
             btnGenerateRegular = new Button
             {
                 Text = "ОБЫЧНАЯ МАТРИЦА",
                 Location = new Point(20, 30),
-                Size = new Size(180, 35),
-                Font = new Font("Arial", 9, FontStyle.Bold)
+                Size = new Size(160, 30),
+                Font = new Font("Arial", 8, FontStyle.Bold)
             };
             btnGenerateRegular.Click += BtnGenerateRegular_Click;
             this.Controls.Add(btnGenerateRegular);
 
             btnGenerateSparse = new Button
             {
-                Text = "РАЗРЕЖЕННАЯ МАТРИЦА",
-                Location = new Point(210, 30),
-                Size = new Size(200, 35),
-                Font = new Font("Arial", 9, FontStyle.Bold)
+                Text = "РАЗРЕЖЕННАЯ",
+                Location = new Point(190, 30),
+                Size = new Size(150, 30),
+                Font = new Font("Arial", 8, FontStyle.Bold)
             };
             btnGenerateSparse.Click += BtnGenerateSparse_Click;
             this.Controls.Add(btnGenerateSparse);
 
-            // Вторая строка кнопок - составные матрицы
             btnGenerateHorizontalComposite = new Button
             {
-                Text = "ГОРИЗОНТАЛЬНАЯ ГРУППА",
-                Location = new Point(20, 75),
-                Size = new Size(200, 35),
-                Font = new Font("Arial", 9, FontStyle.Bold),
+                Text = "ГОРИЗОНТ. ГРУППА",
+                Location = new Point(350, 30),
+                Size = new Size(160, 30),
+                Font = new Font("Arial", 8, FontStyle.Bold),
                 BackColor = Color.LightGreen
             };
             btnGenerateHorizontalComposite.Click += BtnGenerateHorizontalComposite_Click;
@@ -94,10 +121,10 @@ namespace DesignPatterns2.Forms
 
             btnGenerateVerticalComposite = new Button
             {
-                Text = "ВЕРТИКАЛЬНАЯ ГРУППА",
-                Location = new Point(230, 75),
-                Size = new Size(200, 35),
-                Font = new Font("Arial", 9, FontStyle.Bold),
+                Text = "ВЕРТИК. ГРУППА",
+                Location = new Point(520, 30),
+                Size = new Size(150, 30),
+                Font = new Font("Arial", 8, FontStyle.Bold),
                 BackColor = Color.LightBlue
             };
             btnGenerateVerticalComposite.Click += BtnGenerateVerticalComposite_Click;
@@ -105,21 +132,66 @@ namespace DesignPatterns2.Forms
 
             btnGenerateComplexComposite = new Button
             {
-                Text = "СЛОЖНАЯ КОМПОЗИЦИЯ",
-                Location = new Point(440, 75),
-                Size = new Size(200, 35),
-                Font = new Font("Arial", 9, FontStyle.Bold),
+                Text = "КОМПОЗИЦИЯ",
+                Location = new Point(680, 30),
+                Size = new Size(140, 30),
+                Font = new Font("Arial", 8, FontStyle.Bold),
                 BackColor = Color.LightCoral
             };
             btnGenerateComplexComposite.Click += BtnGenerateComplexComposite_Click;
             this.Controls.Add(btnGenerateComplexComposite);
 
-            // Кнопки управления
+            #endregion
+
+            #region Command Buttons (Second Row) ✨ NEW
+
+            btnChange = new Button
+            {
+                Text = "ИЗМЕНИТЬ",
+                Location = new Point(20, 70),
+                Size = new Size(160, 40),
+                Font = new Font("Arial", 10, FontStyle.Bold),
+                BackColor = Color.Orange,
+                ForeColor = Color.White,
+                Enabled = false
+            };
+            btnChange.Click += BtnChange_Click;
+            this.Controls.Add(btnChange);
+
+            btnUndo = new Button
+            {
+                Text = "ОТМЕНИТЬ",
+                Location = new Point(190, 70),
+                Size = new Size(160, 40),
+                Font = new Font("Arial", 10, FontStyle.Bold),
+                BackColor = Color.IndianRed,
+                ForeColor = Color.White,
+                Enabled = false
+            };
+            btnUndo.Click += BtnUndo_Click;
+            this.Controls.Add(btnUndo);
+
+            btnClearHistory = new Button
+            {
+                Text = "ОЧИСТИТЬ ИСТОРИЮ",
+                Location = new Point(360, 70),
+                Size = new Size(180, 40),
+                Font = new Font("Arial", 9, FontStyle.Bold),
+                BackColor = Color.Gray,
+                ForeColor = Color.White
+            };
+            btnClearHistory.Click += BtnClearHistory_Click;
+            this.Controls.Add(btnClearHistory);
+
+            #endregion
+
+            #region Decorator Buttons (Third Row)
+
             btnRenumber = new Button
             {
                 Text = "ПЕРЕНУМЕРОВАТЬ",
-                Location = new Point(660, 30),
-                Size = new Size(180, 35),
+                Location = new Point(550, 70),
+                Size = new Size(160, 40),
                 Font = new Font("Arial", 9, FontStyle.Bold),
                 Enabled = false
             };
@@ -129,27 +201,29 @@ namespace DesignPatterns2.Forms
             btnRestore = new Button
             {
                 Text = "ВОССТАНОВИТЬ",
-                Location = new Point(850, 30),
-                Size = new Size(160, 35),
+                Location = new Point(720, 70),
+                Size = new Size(150, 40),
                 Font = new Font("Arial", 9, FontStyle.Bold),
                 Enabled = false
             };
             btnRestore.Click += BtnRestore_Click;
             this.Controls.Add(btnRestore);
 
-            // Checkbox для границы
             chkShowBorder = new CheckBox
             {
-                Text = "Отображать границу",
-                Location = new Point(660, 80),
-                Size = new Size(200, 30),
+                Text = "Границы",
+                Location = new Point(880, 80),
+                Size = new Size(100, 30),
                 Checked = true,
-                Font = new Font("Arial", 10)
+                Font = new Font("Arial", 9)
             };
             chkShowBorder.CheckedChanged += ChkShowBorder_CheckedChanged;
             this.Controls.Add(chkShowBorder);
 
-            // Label для графики
+            #endregion
+
+            #region Graphics Panel
+
             lblGraphics = new Label
             {
                 Text = "Графическая визуализация:",
@@ -159,11 +233,10 @@ namespace DesignPatterns2.Forms
             };
             this.Controls.Add(lblGraphics);
 
-            // Графическая панель
             graphicsPanel = new Panel
             {
                 Location = new Point(20, 150),
-                Size = new Size(550, 600),
+                Size = new Size(550, 680),
                 BorderStyle = BorderStyle.FixedSingle,
                 BackColor = Color.White,
                 AutoScroll = true
@@ -171,7 +244,10 @@ namespace DesignPatterns2.Forms
             graphicsPanel.Paint += GraphicsPanel_Paint;
             this.Controls.Add(graphicsPanel);
 
-            // Label для консоли
+            #endregion
+
+            #region Console Panel
+
             lblConsole = new Label
             {
                 Text = "Консольная визуализация:",
@@ -181,11 +257,10 @@ namespace DesignPatterns2.Forms
             };
             this.Controls.Add(lblConsole);
 
-            // Консольная панель
             consoleTextBox = new TextBox
             {
                 Location = new Point(590, 150),
-                Size = new Size(580, 600),
+                Size = new Size(450, 680),
                 Multiline = true,
                 ReadOnly = true,
                 Font = new Font("Consolas", 9),
@@ -194,7 +269,38 @@ namespace DesignPatterns2.Forms
                 ForeColor = Color.LimeGreen
             };
             this.Controls.Add(consoleTextBox);
+
+            #endregion
+
+            #region Command History Panel ✨ NEW
+
+            lblCommandHistory = new Label
+            {
+                Text = "История команд:",
+                Location = new Point(1060, 120),
+                Size = new Size(300, 20),
+                Font = new Font("Arial", 10, FontStyle.Bold),
+                ForeColor = Color.DarkRed
+            };
+            this.Controls.Add(lblCommandHistory);
+
+            commandHistoryTextBox = new TextBox
+            {
+                Location = new Point(1060, 150),
+                Size = new Size(310, 680),
+                Multiline = true,
+                ReadOnly = true,
+                Font = new Font("Consolas", 8),
+                ScrollBars = ScrollBars.Both,
+                BackColor = Color.FromArgb(30, 30, 30),
+                ForeColor = Color.Yellow
+            };
+            this.Controls.Add(commandHistoryTextBox);
+
+            #endregion
         }
+
+        #region Matrix Generation Methods
 
         private void BtnGenerateRegular_Click(object? sender, EventArgs e)
         {
@@ -208,9 +314,9 @@ namespace DesignPatterns2.Forms
 
         private void GenerateMatrix(bool isRegular)
         {
-            int rows = 4;
-            int columns = 4;
-            int nonZeroElements = 6;
+            int rows = 5;
+            int columns = 5;
+            int nonZeroElements = 8;
             int maxValue = 9;
 
             if (isRegular)
@@ -228,19 +334,12 @@ namespace DesignPatterns2.Forms
             decorator = null;
             isDecorated = false;
 
-            btnRenumber.Enabled = true;
-            btnRestore.Enabled = false;
-
+            EnableCommandButtons();
             VisualizeMatrix(isRegular);
         }
 
-        /// <summary>
-        /// Демонстрация горизонтальной группы матриц
-        /// Создаем группу из 4 матриц: [2x2 | 3x3 | 5x1 | 1x1]
-        /// </summary>
         private void BtnGenerateHorizontalComposite_Click(object? sender, EventArgs e)
         {
-            // Создаем 4 матрицы разных размеров
             var matrix1 = new RegularMatrix(2, 2);
             FillMatrixWithValue(matrix1, 1);
 
@@ -253,7 +352,6 @@ namespace DesignPatterns2.Forms
             var matrix4 = new RegularMatrix(1, 1);
             FillMatrixWithValue(matrix4, 4);
 
-            // Создаем горизонтальную группу
             var horizontalGroup = new HorizontalMatrixGroup();
             horizontalGroup.AddMatrix(matrix1);
             horizontalGroup.AddMatrix(matrix2);
@@ -265,26 +363,12 @@ namespace DesignPatterns2.Forms
             decorator = null;
             isDecorated = false;
 
-            btnRenumber.Enabled = true;
-            btnRestore.Enabled = false;
-
-            MessageBox.Show(
-                $"Создана горизонтальная группа [2x2 | 3x3 | 5x1 | 1x1]\n\n" +
-                $"RowNum (max): {horizontalGroup.RowNum}\n" +
-                $"ColumnNum (sum): {horizontalGroup.ColumnNum}",
-                "Горизонтальная группа",
-                MessageBoxButtons.OK,
-                MessageBoxIcon.Information);
-
+            EnableCommandButtons();
             VisualizeMatrix(true);
         }
 
-        /// <summary>
-        /// Демонстрация вертикальной группы через транспонирование
-        /// </summary>
         private void BtnGenerateVerticalComposite_Click(object? sender, EventArgs e)
         {
-            // Создаем 3 матрицы
             var matrix1 = new RegularMatrix(2, 5);
             FillMatrixWithValue(matrix1, 1);
 
@@ -294,46 +378,19 @@ namespace DesignPatterns2.Forms
             var matrix3 = new RegularMatrix(2, 5);
             FillMatrixWithValue(matrix3, 3);
 
-            // Создаем вертикальную группу через транспонирование
-            var verticalGroup = VerticalMatrixGroupHelper.CreateVerticalGroup(
-                matrix1,
-                matrix2,
-                matrix3
-            );
+            var verticalGroup = VerticalMatrixGroupHelper.CreateVerticalGroup(matrix1, matrix2, matrix3);
 
             originalMatrix = verticalGroup;
             currentMatrix = originalMatrix;
             decorator = null;
             isDecorated = false;
 
-            btnRenumber.Enabled = true;
-            btnRestore.Enabled = false;
-
-            MessageBox.Show(
-                $"Создана вертикальная группа из 3 матриц:\n" +
-                $"- Матрица 1: 2x5\n" +
-                $"- Матрица 2: 3x5\n" +
-                $"- Матрица 3: 2x5\n\n" +
-                $"Результат: {verticalGroup.RowNum}x{verticalGroup.ColumnNum}\n" +
-                $"RowNum (sum): {verticalGroup.RowNum}\n" +
-                $"ColumnNum (max): {verticalGroup.ColumnNum}",
-                "Вертикальная группа",
-                MessageBoxButtons.OK,
-                MessageBoxIcon.Information);
-
+            EnableCommandButtons();
             VisualizeMatrix(true);
         }
 
-        /// <summary>
-        /// Демонстрация сложной композиции:
-        /// Вертикальная группа из:
-        /// 1. Горизонтальная группа [3x2 | 3x2 | 3x2]
-        /// 2. Горизонтальная группа [2x3 | 2x3]
-        /// 3. Обычная матрица 1x6
-        /// </summary>
         private void BtnGenerateComplexComposite_Click(object? sender, EventArgs e)
         {
-            // Первая горизонтальная группа
             var h1m1 = new RegularMatrix(3, 2);
             FillMatrixWithValue(h1m1, 1);
             var h1m2 = new RegularMatrix(3, 2);
@@ -346,7 +403,6 @@ namespace DesignPatterns2.Forms
             horizontalGroup1.AddMatrix(h1m2);
             horizontalGroup1.AddMatrix(h1m3);
 
-            // Вторая горизонтальная группа
             var h2m1 = new RegularMatrix(2, 3);
             FillMatrixWithValue(h2m1, 4);
             var h2m2 = new RegularMatrix(2, 3);
@@ -356,11 +412,9 @@ namespace DesignPatterns2.Forms
             horizontalGroup2.AddMatrix(h2m1);
             horizontalGroup2.AddMatrix(h2m2);
 
-            // Третья - обычная матрица
             var matrix3 = new RegularMatrix(1, 6);
             FillMatrixWithValue(matrix3, 6);
 
-            // Объединяем вертикально
             var complexComposite = VerticalMatrixGroupHelper.CreateVerticalGroup(
                 horizontalGroup1,
                 horizontalGroup2,
@@ -372,21 +426,117 @@ namespace DesignPatterns2.Forms
             decorator = null;
             isDecorated = false;
 
-            btnRenumber.Enabled = true;
-            btnRestore.Enabled = false;
-
-            MessageBox.Show(
-                $"Создана сложная композиция:\n\n" +
-                $"1. Горизонтальная группа [3x2 | 3x2 | 3x2] = 3x6\n" +
-                $"2. Горизонтальная группа [2x3 | 2x3] = 2x6\n" +
-                $"3. Обычная матрица 1x6\n\n" +
-                $"Итого (вертикальная группа): {complexComposite.RowNum}x{complexComposite.ColumnNum}",
-                "Сложная композиция",
-                MessageBoxButtons.OK,
-                MessageBoxIcon.Information);
-
+            EnableCommandButtons();
             VisualizeMatrix(true);
         }
+
+        #endregion
+
+        #region Command Methods ✨ NEW
+
+        /// <summary>
+        /// Кнопка "ИЗМЕНИТЬ" - случайное изменение матрицы через Command
+        /// </summary>
+        private void BtnChange_Click(object? sender, EventArgs e)
+        {
+            if (currentMatrix == null) return;
+
+            try
+            {
+                // Создаем команду случайного изменения
+                var changeCommand = new RandomChangeMatrixCommand(
+                    currentMatrix,
+                    changesCount: 5,
+                    maxValue: 9
+                );
+
+                // Регистрируем и выполняем через CommandManager
+                _commandManager.RegisterCommand(changeCommand);
+
+                // Обновляем UI
+                UpdateCommandHistory();
+                UpdateUndoButton();
+                VisualizeMatrix(!(originalMatrix is RAZMatrix));
+
+                // Показываем уведомление
+                ShowNotification("Матрица изменена", Color.Orange);
+            }
+            catch (Exception ex)
+            {
+                MessageBox.Show(
+                    $"Ошибка при изменении матрицы:\n{ex.Message}",
+                    "Ошибка",
+                    MessageBoxButtons.OK,
+                    MessageBoxIcon.Error
+                );
+            }
+        }
+
+        /// <summary>
+        /// Кнопка "ОТМЕНИТЬ" - отмена последней команды
+        /// </summary>
+        private void BtnUndo_Click(object? sender, EventArgs e)
+        {
+            try
+            {
+                bool success = _commandManager.UndoLastCommand();
+
+                if (success)
+                {
+                    // Обновляем UI
+                    UpdateCommandHistory();
+                    UpdateUndoButton();
+                    VisualizeMatrix(!(originalMatrix is RAZMatrix));
+
+                    // Показываем уведомление
+                    ShowNotification("Команда отменена", Color.IndianRed);
+                }
+                else
+                {
+                    MessageBox.Show(
+                        "Нет команд для отмены",
+                        "Информация",
+                        MessageBoxButtons.OK,
+                        MessageBoxIcon.Information
+                    );
+                }
+            }
+            catch (Exception ex)
+            {
+                MessageBox.Show(
+                    $"Ошибка при отмене команды:\n{ex.Message}",
+                    "Ошибка",
+                    MessageBoxButtons.OK,
+                    MessageBoxIcon.Error
+                );
+            }
+        }
+
+        /// <summary>
+        /// Очистить историю команд
+        /// </summary>
+        private void BtnClearHistory_Click(object? sender, EventArgs e)
+        {
+            var result = MessageBox.Show(
+                "Вы уверены, что хотите очистить историю команд?\n" +
+                "После этого отмена будет невозможна!",
+                "Подтверждение",
+                MessageBoxButtons.YesNo,
+                MessageBoxIcon.Warning
+            );
+
+            if (result == DialogResult.Yes)
+            {
+                _commandManager.ClearHistory();
+                UpdateCommandHistory();
+                UpdateUndoButton();
+                ShowNotification("История очищена", Color.Gray);
+            }
+        }
+
+        #endregion
+
+        #region Decorator Methods (existing)
 
         private void BtnRenumber_Click(object? sender, EventArgs e)
         {
@@ -420,6 +570,10 @@ namespace DesignPatterns2.Forms
                            originalMatrix is TransposeDecorator;
             VisualizeMatrix(isRegular);
         }
+
+        #endregion
+
+        #region Visualization
 
         private void VisualizeMatrix(bool isRegular)
         {
@@ -460,7 +614,7 @@ namespace DesignPatterns2.Forms
             Graphics g = e.Graphics;
             g.SmoothingMode = System.Drawing.Drawing2D.SmoothingMode.AntiAlias;
 
-            int cellSize = 40; // Уменьшенный размер для больших матриц
+            int cellSize = 40;
             if (currentMatrix.RowNum > 6 || currentMatrix.ColumnNum > 6)
                 cellSize = 30;
 
@@ -493,9 +647,10 @@ namespace DesignPatterns2.Forms
             }
         }
 
-        /// <summary>
-        /// Вспомогательный метод для заполнения матрицы одинаковым значением
-        /// </summary>
+        #endregion
+
+        #region Helper Methods
+
         private void FillMatrixWithValue(IMatrix matrix, float value)
         {
             for (int i = 0; i < matrix.RowNum; i++)
@@ -506,5 +661,89 @@ namespace DesignPatterns2.Forms
                 }
             }
         }
+
+        private void EnableCommandButtons()
+        {
+            btnChange.Enabled = true;
+            btnRenumber.Enabled = true;
+            btnRestore.Enabled = false;
+            UpdateUndoButton();
+        }
+
+        /// <summary>
+        /// Обновить состояние кнопки "Отменить"
+        /// </summary>
+        private void UpdateUndoButton()
+        {
+            btnUndo.Enabled = _commandManager.CanUndo;
+
+            // Обновляем текст кнопки с количеством команд
+            int undoableCount = _commandManager.CommandHistory.Count(c => c.CanUndo);
+            btnUndo.Text = undoableCount > 0
+                ? $"ОТМЕНИТЬ ({undoableCount})"
+                : "ОТМЕНИТЬ";
+        }
+
+        /// <summary>
+        /// Обновить панель истории команд
+        /// </summary>
+        private void UpdateCommandHistory()
+        {
+            if (_commandManager.HistoryCount == 0)
+            {
+                commandHistoryTextBox.Text = "История команд пуста\r\n\r\nНажмите 'ИЗМЕНИТЬ' для создания команды";
+                return;
+            }
+
+            var history = new System.Text.StringBuilder();
+            history.AppendLine("=== ИСТОРИЯ КОМАНД ===\r\n");
+
+            var commands = _commandManager.CommandHistory.Reverse().ToList();
+            for (int i = 0; i < commands.Count; i++)
+            {
+                var cmd = commands[i];
+                string undoMark = cmd.CanUndo ? "✓" : "✗";
+                history.AppendLine($"[{commands.Count - i}] {undoMark} {cmd.Description}");
+                history.AppendLine($"    Время: {cmd.ExecutedAt:HH:mm:ss}");
+                history.AppendLine($"    Отмена: {(cmd.CanUndo ? "Возможна" : "Невозможна")}\r\n");
+            }
+
+            history.AppendLine($"\r\nВсего команд: {_commandManager.HistoryCount}");
+            history.AppendLine($"Доступно для отмены: {_commandManager.CommandHistory.Count(c => c.CanUndo)}");
+
+            commandHistoryTextBox.Text = history.ToString();
+
+            // Прокручиваем вверх
+            commandHistoryTextBox.SelectionStart = 0;
+            commandHistoryTextBox.ScrollToCaret();
+        }
+
+        /// <summary>
+        /// Показать временное уведомление
+        /// </summary>
+        private void ShowNotification(string message, Color color)
+        {
+            var originalColor = lblInfo.BackColor;
+            var originalText = lblInfo.Text;
+
+            lblInfo.Text = message;
+            lblInfo.BackColor = color;
+            lblInfo.ForeColor = Color.White;
+
+            // Таймер для восстановления через 2 секунды
+            var timer = new System.Windows.Forms.Timer();
+            timer.Interval = 2000;
+            timer.Tick += (s, e) =>
+            {
+                lblInfo.Text = originalText;
+                lblInfo.BackColor = originalColor;
+                lblInfo.ForeColor = Color.DarkBlue;
+                timer.Stop();
+                timer.Dispose();
+            };
+            timer.Start();
+        }
+
+        #endregion
     }
 }
